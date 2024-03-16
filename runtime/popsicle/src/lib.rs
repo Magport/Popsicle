@@ -26,6 +26,7 @@ use sp_std::prelude::*;
 use sp_version::NativeVersion;
 use sp_version::RuntimeVersion;
 
+use frame_support::sp_runtime::AccountId32;
 use frame_support::{
 	construct_runtime,
 	dispatch::DispatchClass,
@@ -38,17 +39,18 @@ use frame_system::{
 	limits::{BlockLength, BlockWeights},
 	EnsureRoot, EnsureSigned,
 };
+pub use pallet_container;
 use pallet_xcm::{EnsureXcm, IsVoiceOfBody};
+use primitives_container::DownloadInfo;
 pub use runtime_common::{
 	AVERAGE_ON_INITIALIZE_RATIO, DAYS, HOURS, MAXIMUM_BLOCK_WEIGHT, MILLISECS_PER_BLOCK, MINUTES,
 	NORMAL_DISPATCH_RATIO, SLOT_DURATION,
 };
 pub use sp_consensus_aura::sr25519::AuthorityId as AuraId;
-pub use sp_runtime::{MultiAddress, Perbill, Permill};
-use xcm_config::{RelayLocation, XcmConfig, XcmOriginToTransactDispatchOrigin};
-
 #[cfg(any(feature = "std", test))]
 pub use sp_runtime::BuildStorage;
+pub use sp_runtime::{MultiAddress, Perbill, Permill};
+use xcm_config::{RelayLocation, XcmConfig, XcmOriginToTransactDispatchOrigin};
 
 // Polkadot imports
 use polkadot_runtime_common::{BlockHashCount, SlowAdjustingFeeUpdate};
@@ -552,7 +554,30 @@ impl pallet_collator_selection::Config for Runtime {
 	type ValidatorRegistration = Session;
 	type WeightInfo = ();
 }
+impl pallet_parachain_template::Config for Runtime {
+	type RuntimeEvent = RuntimeEvent;
+	type WeightInfo = ();
+}
+impl pallet_sequencer_grouping::Config for Runtime {
+	type RuntimeEvent = RuntimeEvent;
+}
+parameter_types! {
+	pub const MaxLengthFileName: u32 = 256;
+	pub const MaxRuningAPP: u32 = 100;
+	pub const MaxUrlLength: u32 = 300;
+	pub const MaxArgCount: u32 = 10;
+	pub const MaxArgLength: u32 = 100;
+}
 
+impl pallet_container::Config for Runtime {
+	type RuntimeEvent = RuntimeEvent;
+	type WeightInfo = pallet_container::weights::SubstrateWeight<Runtime>;
+	type MaxLengthFileName = MaxLengthFileName;
+	type MaxRuningAPP = MaxRuningAPP;
+	type MaxUrlLength = MaxUrlLength;
+	type MaxArgCount = MaxArgCount;
+	type MaxArgLength = MaxArgLength;
+}
 // Create the runtime by composing the FRAME pallets that were previously configured.
 construct_runtime!(
 	pub struct Runtime {
@@ -585,6 +610,9 @@ construct_runtime!(
 		PolkadotXcm: pallet_xcm = 31,
 		CumulusXcm: cumulus_pallet_xcm = 32,
 		DmpQueue: cumulus_pallet_dmp_queue = 33,
+		TemplatePallet: pallet_parachain_template = 50,
+		ContainerPallet:pallet_container = 51,
+		SequencerGroupingPallet: pallet_sequencer_grouping = 52,
 	}
 );
 
@@ -599,6 +627,7 @@ mod benches {
 		[pallet_collator_selection, CollatorSelection]
 		[cumulus_pallet_xcmp_queue, XcmpQueue]
 		[pallet_motion, Motion]
+		[pallet_container, ContainerPallet]
 	);
 }
 
@@ -753,7 +782,20 @@ impl_runtime_apis! {
 			ParachainSystem::collect_collation_info(header)
 		}
 	}
+	impl primitives_container::ContainerRuntimeApi<Block, AccountId32> for Runtime {
 
+		fn shuld_load(author:AccountId32)->Option<DownloadInfo> {
+			ContainerPallet::shuld_load(author)
+		}
+
+		fn get_group_id(author:AccountId32) -> u32 {
+			ContainerPallet::get_group_id(author)
+		}
+
+		fn get_groups()->Vec<u32> {
+			ContainerPallet::get_groups()
+		}
+	}
 	#[cfg(feature = "try-runtime")]
 	impl frame_try_runtime::TryRuntime<Block> for Runtime {
 		fn on_runtime_upgrade(checks: frame_try_runtime::UpgradeCheckSelect) -> (Weight, Weight) {
