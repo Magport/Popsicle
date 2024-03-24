@@ -6,7 +6,7 @@ use super::*;
 use crate::Pallet as Template;
 use frame_benchmarking::v2::*;
 use frame_system::RawOrigin;
-
+use scale_info::prelude::vec;
 #[benchmarks]
 mod benchmarks {
 	use super::*;

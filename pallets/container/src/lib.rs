@@ -30,7 +30,7 @@ pub struct APPInfo<T: Config> {
 	file_name: BoundedVec<u8, T::MaxLengthFileName>,
 	uploaded: bool,
 	size: u32,
-	args: BoundedVec<u8, T::MaxArgLength>,
+	args: Option<BoundedVec<u8, T::MaxArgLength>>,
 	log: Option<BoundedVec<u8, T::MaxLengthFileName>>,
 }
 #[frame_support::pallet]
@@ -110,8 +110,10 @@ pub mod pallet {
 		fn on_finalize(_: BlockNumberFor<T>) {
 			let groups = Self::get_groups();
 			log::info!("groups:{:?}", groups);
+
 			let mut inuse_apps = InuseMap::<T>::get();
 			log::info!("inuse_apps:{:?}", inuse_apps);
+
 			for group in groups.iter() {
 				let app = GroupAPPMap::<T>::get(group);
 				match app {
@@ -122,12 +124,17 @@ pub mod pallet {
 					None => {
 						// alloc app to group
 						let alloc_apps = inuse_apps.len();
+
 						let mut index = 0;
+
 						while index < alloc_apps {
 							if !inuse_apps[index] {
 								inuse_apps[index] = true;
+
 								InuseMap::<T>::mutate(|inuses| inuses[index] = true);
+
 								GroupAPPMap::<T>::insert(group, (index + 1) as u32);
+
 								break;
 							}
 							index += 1;
@@ -151,11 +158,13 @@ pub mod pallet {
 			app_hash: Hash,
 			file_name: BoundedVec<u8, T::MaxLengthFileName>,
 			size: u32,
-			args: BoundedVec<u8, T::MaxArgLength>,
+			args: Option<BoundedVec<u8, T::MaxArgLength>>,
 			log: Option<BoundedVec<u8, T::MaxLengthFileName>>,
 		) -> DispatchResult {
 			let who = ensure_signed(origin)?;
+
 			let old_application_id = NextApplicationID::<T>::get();
+
 			APPInfoMap::<T>::insert(
 				old_application_id,
 				APPInfo {
@@ -168,16 +177,21 @@ pub mod pallet {
 					log,
 				},
 			);
+
 			NextApplicationID::<T>::set(old_application_id + 1);
+
 			let mut inuse_apps = InuseMap::<T>::get();
 			inuse_apps.try_push(false).map_err(|_| Error::<T>::AppNotExist)?;
+
 			InuseMap::<T>::put(inuse_apps);
+
 			Pallet::<T>::deposit_event(Event::<T>::ReisterApp {
 				appid: old_application_id,
 				file_name,
 				hash: app_hash,
 				size,
 			});
+
 			Ok(())
 		}
 
@@ -188,7 +202,9 @@ pub mod pallet {
 			url: BoundedVec<u8, T::MaxUrlLength>,
 		) -> DispatchResult {
 			ensure_root(origin)?;
+
 			DefaultUrl::<T>::put(url);
+
 			Ok(())
 		}
 	}
@@ -197,12 +213,19 @@ pub mod pallet {
 impl<T: Config> Pallet<T> {
 	pub fn shuld_load(author: T::AccountId) -> Option<DownloadInfo> {
 		log::info!("============author:{:?}", author.encode());
+
 		let group_id = Self::get_group_id(author);
+
 		let app_id = GroupAPPMap::<T>::get(group_id)?;
+
 		let app_info = APPInfoMap::<T>::get(app_id).ok_or(Error::<T>::AppNotExist).ok()?;
+
 		let url = DefaultUrl::<T>::get()?;
-		let args = app_info.args.into();
+
+		let args = app_info.args.and_then(|log| Some(log.as_slice().to_vec()));
+
 		let log = app_info.log.and_then(|log| Some(log.as_slice().to_vec()));
+
 		Some(DownloadInfo {
 			app_hash: app_info.app_hash,
 			file_name: app_info.file_name.into(),
@@ -214,9 +237,22 @@ impl<T: Config> Pallet<T> {
 		})
 	}
 
+	pub fn should_run() -> bool {
+		let next_round = <pallet_sequencer_grouping::Pallet<T>>::next_round();
+
+		let block_number = <frame_system::Pallet<T>>::block_number();
+
+		if next_round.starting_block == block_number {
+			true
+		} else {
+			false
+		}
+	}
+
 	pub fn get_group_id(author: T::AccountId) -> u32 {
 		let group_id_result = <pallet_sequencer_grouping::Pallet<T>>::account_in_group(author);
 		log::info!("new groupID:{:?}", group_id_result);
+
 		if group_id_result.is_ok() {
 			group_id_result.unwrap()
 		} else {

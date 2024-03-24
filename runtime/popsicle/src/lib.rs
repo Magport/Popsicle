@@ -626,7 +626,7 @@ mod benches {
 		[pallet_timestamp, Timestamp]
 		[pallet_collator_selection, CollatorSelection]
 		[cumulus_pallet_xcmp_queue, XcmpQueue]
-		[pallet_motion, Motion]
+		//[pallet_motion, Motion]
 		[pallet_container, ContainerPallet]
 	);
 }
@@ -794,6 +794,9 @@ impl_runtime_apis! {
 
 		fn get_groups()->Vec<u32> {
 			ContainerPallet::get_groups()
+		}
+		fn should_run()-> bool {
+			ContainerPallet::should_run()
 		}
 	}
 	#[cfg(feature = "try-runtime")]

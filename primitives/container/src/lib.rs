@@ -10,7 +10,7 @@ pub struct DownloadInfo {
 	pub size: u32,
 	pub group: u32,
 	pub url: Vec<u8>,
-	pub args: Vec<u8>,
+	pub args: Option<Vec<u8>>,
 	pub log: Option<Vec<u8>>,
 }
 
@@ -20,6 +20,7 @@ sp_api::decl_runtime_apis! {
 	AuthorityId:Codec
 	{
 		fn shuld_load(author:AuthorityId)->Option<DownloadInfo>;
+		fn should_run()-> bool;
 		fn get_group_id(author:AuthorityId) ->u32;
 		fn get_groups()->Vec<u32>;
 	}

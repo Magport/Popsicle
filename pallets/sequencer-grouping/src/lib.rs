@@ -22,6 +22,14 @@ pub mod pallet {
 	#[pallet::pallet]
 	pub struct Pallet<T>(_);
 
+	pub type RoundIndex = u32;
+	#[derive(
+		Clone, Eq, PartialEq, RuntimeDebug, Encode, Decode, TypeInfo, MaxEncodedLen, Default,
+	)]
+	pub struct NextRound<BlockNumber> {
+		pub starting_block: BlockNumber,
+		pub round_index: RoundIndex,
+	}
 	// The pallet's runtime storage items.
 	// https://docs.substrate.io/v3/runtime/storage
 	#[pallet::storage]
@@ -39,6 +47,10 @@ pub mod pallet {
 	#[pallet::getter(fn groupID)]
 	pub type GroupID<T> = StorageValue<_, u32, ValueQuery, GroupIDOnEmpty<T>>;
 
+	#[pallet::storage]
+	#[pallet::getter(fn next_round_t)]
+	pub type NextRoundStorage<T: Config> =
+		StorageValue<_, NextRound<BlockNumberFor<T>>, ValueQuery>;
 	// Pallets use events to inform users when important changes are made.
 	// https://docs.substrate.io/v3/runtime/events-and-errors
 	#[pallet::event]
@@ -61,15 +73,15 @@ pub mod pallet {
 	#[pallet::hooks]
 	impl<T: Config> Hooks<BlockNumberFor<T>> for Pallet<T> {
 		fn on_finalize(block_number: BlockNumberFor<T>) {
-			let old_group_id = GroupID::<T>::get();
-			let transaction_type = block_number % 2u32.into();
-			if transaction_type == Zero::zero() {
-				let mut new_group_id = old_group_id + 1;
-				if new_group_id == 5 {
-					new_group_id = 1;
-				}
-				GroupID::<T>::put(new_group_id);
-			}
+			// let old_group_id = GroupID::<T>::get();
+			// let transaction_type = block_number % 4u32.into();
+			// if transaction_type == Zero::zero() {
+			// 	let mut new_group_id = old_group_id + 1;
+			// 	if new_group_id == 5 {
+			// 		new_group_id = 1;
+			// 	}
+			// 	GroupID::<T>::put(new_group_id);
+			// }
 		}
 	}
 
@@ -124,6 +136,17 @@ pub mod pallet {
 			<GroupID<T>>::put(groupID);
 			Ok(().into())
 		}
+
+		#[pallet::call_index(3)]
+		#[pallet::weight(0)]
+		pub fn set_next_round(
+			origin: OriginFor<T>,
+			round: NextRound<BlockNumberFor<T>>,
+		) -> DispatchResultWithPostInfo {
+			ensure_signed(origin)?;
+			<NextRoundStorage<T>>::put(round);
+			Ok(().into())
+		}
 	}
 }
 
@@ -139,5 +162,9 @@ impl<T: Config> Pallet<T> {
 			groups.push(i + 1);
 		}
 		groups
+	}
+
+	pub fn next_round() -> NextRound<BlockNumberFor<T>> {
+		NextRoundStorage::<T>::get()
 	}
 }

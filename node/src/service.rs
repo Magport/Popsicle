@@ -404,6 +404,7 @@ where
 			&task_manager,
 			params.keystore_container.keystore(),
 			data_path,
+			backend,
 		)?;
 	}
 
